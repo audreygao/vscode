@@ -13,6 +13,7 @@ import { ensureNoDisposablesAreLeakedInTestSuite } from 'vs/base/test/common/uti
 suite('ObjectTree', function () {
 
 	suite('TreeNavigator', function () {
+
 		let tree: ObjectTree<number>;
 		let filter = (_: number) => true;
 
@@ -221,6 +222,158 @@ suite('ObjectTree', function () {
 		tree.setChildren(null, [{ element: 100 }, { element: 101 }, { element: 102 }, { element: 103 }]);
 		assert.deepStrictEqual(tree.getFocus(), [101]);
 	});
+
+	test('setSelection correctly sets the selection (no uievent)', function () {
+		const container = document.createElement('div');
+		container.style.width = '200px';
+		container.style.height = '200px';
+
+		const delegate = new class implements IListVirtualDelegate<number> {
+			getHeight() { return 20; }
+			getTemplateId(): string { return 'default'; }
+		};
+
+		const renderer = new class implements ITreeRenderer<number, void, HTMLElement> {
+			readonly templateId = 'default';
+			renderTemplate(container: HTMLElement): HTMLElement {
+				return container;
+			}
+			renderElement(element: ITreeNode<number, void>, index: number, templateData: HTMLElement): void {
+				templateData.textContent = `${element.element}`;
+			}
+			disposeTemplate(): void { }
+		};
+
+		const identityProvider = new class implements IIdentityProvider<number> {
+			getId(element: number): { toString(): string } {
+				return `${element % 100}`;
+			}
+		};
+
+		const tree = new ObjectTree<number>('test', container, delegate, [renderer], { identityProvider });
+		tree.layout(200);
+
+		tree.setChildren(null, [{ element: 0 }, { element: 1 }, { element: 2 }, { element: 3 }]);
+
+		tree.setFocus([1]);
+		assert.deepStrictEqual(tree.getFocus(), [1]);
+
+		tree.setSelection([2]);
+		assert.deepStrictEqual(tree.getSelection(), [2]);
+
+		tree.setChildren(null, [{ element: 100 }, { element: 101 }, { element: 102 }, { element: 103 }]);
+		assert.deepStrictEqual(tree.getFocus(), [101]);
+		assert.deepStrictEqual(tree.getSelection(), [102]);
+
+		tree.setChildren(null, [{ element: 100 }, { element: 101 }, { element: 102 }, { element: 103 }]);
+		assert.deepStrictEqual(tree.getFocus(), [101]);
+		assert.deepStrictEqual(tree.getSelection(), [102]);
+	});
+
+	test('setSelection correctly sets the selection (fake UIEvent)', function () {
+		const container = document.createElement('div');
+		container.style.width = '200px';
+		container.style.height = '200px';
+
+		const delegate = new class implements IListVirtualDelegate<number> {
+			getHeight() { return 20; }
+			getTemplateId(): string { return 'default'; }
+		};
+
+		const renderer = new class implements ITreeRenderer<number, void, HTMLElement> {
+			readonly templateId = 'default';
+			renderTemplate(container: HTMLElement): HTMLElement {
+				return container;
+			}
+			renderElement(element: ITreeNode<number, void>, index: number, templateData: HTMLElement): void {
+				templateData.textContent = `${element.element}`;
+			}
+			disposeTemplate(): void { }
+		};
+
+		const identityProvider = new class implements IIdentityProvider<number> {
+			getId(element: number): { toString(): string } {
+				return `${element % 100}`;
+			}
+		};
+
+		const tree = new ObjectTree<number>('test', container, delegate, [renderer], { identityProvider });
+		tree.layout(200);
+
+		tree.setChildren(null, [{ element: 0 }, { element: 1 }, { element: 2 }, { element: 3 }]);
+
+		tree.setFocus([1]);
+		assert.deepStrictEqual(tree.getFocus(), [1]);
+
+		const fakeKeyboardEvent = new KeyboardEvent('keydown');
+		tree.setSelection([2], fakeKeyboardEvent);
+		assert.deepStrictEqual(tree.getSelection(), [2]);
+
+		tree.setChildren(null, [{ element: 100 }, { element: 101 }, { element: 102 }, { element: 103 }]);
+		assert.deepStrictEqual(tree.getFocus(), [101]);
+		assert.deepStrictEqual(tree.getSelection(), [102]);
+	});
+
+	test('setSelection correctly sets the selection with collapse(fake UIEvent)', function () {
+		const container = document.createElement('div');
+		container.style.width = '200px';
+		container.style.height = '200px';
+
+		const delegate = new class implements IListVirtualDelegate<number> {
+			getHeight() { return 20; }
+			getTemplateId(): string { return 'default'; }
+		};
+
+		const renderer = new class implements ITreeRenderer<number, void, HTMLElement> {
+			readonly templateId = 'default';
+			renderTemplate(container: HTMLElement): HTMLElement {
+				return container;
+			}
+			renderElement(element: ITreeNode<number, void>, index: number, templateData: HTMLElement): void {
+				templateData.textContent = `${element.element}`;
+			}
+			disposeTemplate(): void { }
+		};
+
+		const identityProvider = new class implements IIdentityProvider<number> {
+			getId(element: number): { toString(): string } {
+				return `${element % 100}`;
+			}
+		};
+
+		const tree = new ObjectTree<number>('test', container, delegate, [renderer], { identityProvider });
+		tree.layout(200);
+
+		const child = [{
+			element: 0, children: [
+				{ element: 10 },
+				{ element: 11 },
+				{ element: 12 },
+			]
+		}, { element: 1 }, { element: 2 }, { element: 3 }];
+
+		tree.setChildren(null, child);
+
+		tree.setFocus([0]);
+		assert.deepStrictEqual(tree.getFocus(), [0]);
+
+		const fakeKeyboardEvent = new KeyboardEvent('keydown');
+		tree.setSelection([12], fakeKeyboardEvent);
+		assert.deepStrictEqual(tree.getSelection(), [12]);
+
+		tree.collapse(child[0].element);
+		assert.deepStrictEqual(tree.getSelection(), [12]);
+
+		tree.setChildren(null, [{ element: 100 }, { element: 101 }, { element: 102 }, { element: 103 }]);
+		assert.deepStrictEqual(tree.getFocus(), [100]);
+		assert.deepStrictEqual(tree.getSelection(), [103]);
+
+		tree.setChildren(null, [{ element: 20 }, { element: 21 }]);
+		assert.deepStrictEqual(tree.getSelection(), [21]);
+
+	});
+
+
 });
 
 function getRowsTextContent(container: HTMLElement): string[] {
